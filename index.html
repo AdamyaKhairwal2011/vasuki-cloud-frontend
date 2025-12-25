@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vasuki Cloud</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b0b0b;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .app {
+      width: 420px;
+      background: #141414;
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    }
+
+    h2 {
+      margin: 0 0 15px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    input, button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+    }
+
+    input {
+      background: #0f0f0f;
+      color: #fff;
+    }
+
+    input[type="file"] {
+      color: #aaa;
+    }
+
+    button {
+      background: #4caf50;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #2c2c2c;
+      margin-top: 6px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .error { color: #f44336; }
+    .success { color: #4caf50; }
+
+    .files {
+      margin-top: 15px;
+      background: #0f0f0f;
+      border-radius: 6px;
+      padding: 10px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .file {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #1f1f1f;
+      font-size: 13px;
+    }
+
+    .file:last-child {
+      border-bottom: none;
+    }
+
+    .file-name {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-actions a {
+      color: #4caf50;
+      text-decoration: none;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <h2>Vasuki Cloud</h2>
+
+  <input type="email" id="email" placeholder="Enter your email" />
+  <input type="file" id="files" multiple />
+
+  <button onclick="uploadFiles()">Upload Files</button>
+  <button class="secondary" onclick="loadFiles()">Refresh Files</button>
+
+  <div id="status" class="status"></div>
+
+  <div id="filesBox" class="files" style="display:none;"></div>
+</div>
+
+<script>
+const BACKEND_URL =
+  "https://vasuki-cloud-backend-production.up.railway.app";
+
+  const emailInput = document.getElementById("email");
+  const filesInput = document.getElementById("files");
+  const statusBox = document.getElementById("status");
+  const filesBox = document.getElementById("filesBox");
+
+  function setStatus(msg, type) {
+    statusBox.textContent = msg;
+    statusBox.className = "status " + type;
+  }
+
+  async function uploadFiles() {
+    const email = emailInput.value.trim();
+
+    if (!email) return setStatus("Email is required", "error");
+    if (!filesInput.files.length) return setStatus("Select at least one file", "error");
+
+    const formData = new FormData();
+    formData.append("email", email);
+
+    for (const file of filesInput.files) {
+      formData.append("files", file);
+    }
+
+    try {
+      setStatus("Uploading...", "");
+      const res = await fetch(`${BACKEND_URL}/upload`, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Upload failed");
+
+      setStatus("Upload successful", "success");
+      filesInput.value = "";
+      loadFiles();
+
+    } catch (err) {
+      setStatus(err.message, "error");
+    }
+  }
+
+  async function loadFiles() {
+    const email = emailInput.value.trim();
+    if (!email) return setStatus("Enter email to load files", "error");
+
+    try {
+fetch(`${BACKEND_URL}/list-files`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ email })
+})
+
+
+      const data = await res.json();
+      filesBox.innerHTML = "";
+
+      if (!data.files || data.files.length === 0) {
+        filesBox.style.display = "block";
+        filesBox.innerHTML = "<div style='font-size:13px;color:#aaa'>No files found</div>";
+        return;
+      }
+
+      data.files.forEach(file => {
+        const div = document.createElement("div");
+        div.className = "file";
+
+        div.innerHTML = `
+          <div class="file-name" title="${file.name}">
+            ${file.name}
+          </div>
+          <div class="file-actions">
+            <a href="${BACKEND_URL}/download/${encodeURIComponent(email)}/${encodeURIComponent(file.name)}" target="_blank">
+              Download
+            </a>
+          </div>
+        `;
+
+        filesBox.appendChild(div);
+      });
+
+      filesBox.style.display = "block";
+      setStatus("Files loaded", "success");
+
+    } catch (err) {
+      setStatus("Failed to load files"+err, "error");
+    }
+  }
+</script>
+
+</body>
+</html>
